@@ -4,3 +4,6 @@
 [submodule "meta-xilinx"]
 	path = meta-xilinx
 	url = https://github.com/Xilinx/meta-xilinx.git
+[submodule "meta-pynq"]
+	path = meta-pynq
+	url = git@course-gitlab.tuni.fi:comp-ce-460-embedded-linux-drivers_2024-2025/meta-pynq.git
