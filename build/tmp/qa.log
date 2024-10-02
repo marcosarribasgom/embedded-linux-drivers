@@ -25,3 +25,4 @@ POSSIBILITY OF SUCH DAMAGES.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 hello-module: Check if the license information has changed in /home/student/19/build/tmp/work/pynq-poky-linux-gnueabi/hello-module/1.0-r0/COPYING to verify that the LICENSE value "GPLv2" remains valid [license-checksum]
+hello-module-1.0: hello-module: /kernel-module-hello-module-4.9.0-xilinx-v2017.3/lib/modules/4.9.0-xilinx-v2017.3/extra/hello_module.ko is owned by uid 1001, which is the same as the user running bitbake. This may be due to host contamination [host-user-contaminated]
