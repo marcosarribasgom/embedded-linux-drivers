@@ -146,4 +146,7 @@ module_exit(evil_exit);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("The evil kernel module for the Real-time systems course");
 MODULE_AUTHOR("Jan Lipponen <jan.lipponen@wapice.com>");
+MODULE_AUTHOR("Ashfak <mdashfakhaider.nehal@tuni.fi>");
+MODULE_AUTHOR("Marcos <marcos.arribas-gomez@tuni.fi>");
+MODULE_AUTHOR("Asrii <mohamed.asri@tuni.fi>");
 MODULE_VERSION("1.0");
