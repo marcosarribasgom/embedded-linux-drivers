@@ -53,6 +53,11 @@ static void do_tasklet(unsigned long data)
 
 // The sysfs attribute invoked when writing
 static ssize_t store_evil(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count) {
+    if (count > INPUT_BUFSIZE - 1) {
+        printk(KERN_ERR "EVIL: Input buffer size exceeded\n");
+        return -EINVAL; // Return an error if the input size is too large
+    }
+
     // Read the user parameters
     snprintf(input_buf, INPUT_BUFSIZE, "%s", buf);
 
