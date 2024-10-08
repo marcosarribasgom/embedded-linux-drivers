@@ -26,7 +26,15 @@ static void do_tasklet(unsigned long data)
         printk(KERN_INFO "EVIL: storage full\n");
         return;
     }
-
+static void strreplace(char *str, char old, char new)
+{
+    while (*str) {
+        if (*str == old) {
+            *str = new;
+        }
+        str++;
+    }
+}
     // Replace 'a's with ' ' in the name of evilness
     strreplace((char *)data, 'a', ' ');
 
@@ -54,12 +62,12 @@ static ssize_t store_evil(struct device *dev, struct device_attribute *attr, con
 // The sysfs attribute invoked when reading from the file
 static ssize_t show_evil(struct device *dev, struct device_attribute *attr, char *buf) {
     uint32_t bytes = 0;
-    int32_t retval;
+    int32_t retval = 0;
 
     // Go through the data storage and write all found strings to the output buffer
-    while(1) {
-        retval += sprintf(&buf[bytes], "%s", &data_storage[bytes]);
-        if(retval == 0) {
+    while(bytes < bytes_stored) {
+        retval = sprintf(&buf[bytes], "%s", &data_storage[bytes]);
+        if(retval <= 0) {
             break;
         }
         // Null-character excluded from the sprintf return value so 1 should be added
@@ -78,7 +86,7 @@ static struct device_attribute dev_attr_evil = {
     .attr = {
         .name = SYSFS_FILE_ATTR_NAME,
         .mode = S_IRUGO,
-    },
+    }
     .show = show_evil,
     .store = store_evil,
 };
@@ -107,11 +115,24 @@ static int32_t __init evil_init(void)
     }
 
     // Add attributes to the kobject
+static struct kobj_attribute evil_attribute = __ATTR(evil, 0664, show_evil, store_evil);
     // The attributes are presented as a file in the created directory
-    retval = sysfs_create_file(evil_kobj, &dev_attr_evil.attr);
+    retval = sysfs_create_file(evil_kobj, &evil_atrribute.attr);
     if(retval) {
         printk(KERN_ERR "EVIL: sysfs_create_file failed\n");
-        goto error_sysfs_create;
+        kobject_put(evil_kobj);
+        kfree(data_storage);
+        return retval;
+    }
+    // Allocate memory for the tasklet before initialization
+    tasklet = kmalloc(sizeof(struct tasklet_struct), GFP_KERNEL);
+    if (!tasklet) {
+        printk(KERN_ERR "EVIL: tasklet allocation failed\n");
+        // Error handling if memory allocation fails
+        sysfs_remove_file(evil_kobj, &evil_attribute.attr);
+        kobject_put(evil_kobj);
+        kfree(data_storage);
+        return -ENOMEM;    
     }
 
     // Initialize the tasklet
@@ -131,11 +152,22 @@ static int32_t __init evil_init(void)
 // The kernel module exit function
 static void __exit evil_exit(void)
 {
-    kfree(tasklet);
-    tasklet_kill(tasklet);
-    kobject_del(evil_kobj);
-    sysfs_remove_file(evil_kobj, &dev_attr_evil.attr);
-    kfree(data_storage);
+    // Kill the tasklet before freeing the memory
+    if (tasklet) {
+        tasklet_kill(tasklet);
+        kfree(tasklet);
+    }
+
+    // Remove sysfs attribute, then delete the kobject
+    if (evil_kobj) {
+        sysfs_remove_file(evil_kobj, &evil_attribute.attr);
+        kobject_put(evil_kobj);
+    }
+
+    // Free the allocated data storage
+    if (data_storage) {
+        kfree(data_storage);
+    }
 
     printk(KERN_INFO "EVIL: MUAHAHAHA\n");
 }
@@ -148,5 +180,5 @@ MODULE_DESCRIPTION("The evil kernel module for the Real-time systems course");
 MODULE_AUTHOR("Jan Lipponen <jan.lipponen@wapice.com>");
 MODULE_AUTHOR("Ashfak <mdashfakhaider.nehal@tuni.fi>");
 MODULE_AUTHOR("Marcos <marcos.arribas-gomez@tuni.fi>");
-MODULE_AUTHOR("Asrii <mohamed.asri@tuni.fi>");
+MODULE_AUTHOR("Asri <mohamed.asri@tuni.fi>");
 MODULE_VERSION("1.0");
