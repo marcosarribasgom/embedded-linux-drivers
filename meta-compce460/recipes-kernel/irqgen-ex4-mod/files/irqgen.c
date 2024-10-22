@@ -20,7 +20,7 @@
 #include "irqgen_addresses.h"       // Device specific addresses
 
 /* Linux IRQ number for the first hwirq line */
-#define IRQGEN_FIRST_IRQ 29 // FIXED: extracted from the devicetree.dts
+#define IRQGEN_FIRST_IRQ 38 // FIXED: extracted from the devicetree.dts
 
 // Kernel token address to access the IRQ Generator core register
 void __iomem *irqgen_reg_base = NULL;
