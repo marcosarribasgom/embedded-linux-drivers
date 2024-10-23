@@ -20,7 +20,7 @@
 #include "irqgen_addresses.h"       // Device specific addresses
 
 /* Linux IRQ number for the first hwirq line */
-#define IRQGEN_FIRST_IRQ 38 // FIXED: extracted from the devicetree.dts
+#define IRQGEN_FIRST_IRQ 45 // FIXED: use the correct Linux IRQ number
 
 // Kernel token address to access the IRQ Generator core register
 void __iomem *irqgen_reg_base = NULL;
@@ -62,12 +62,16 @@ static int parse_parameters(void)
 /* FIXED: (1) Implement the interrupt handler function */
 static irqreturn_t irqgen_irqhandler(int irq, void *data)
 {
-#ifdef DEBUG
-    printk(KERN_INFO KMSG_PFX "IRQ #%d received.\n", irq);
-#endif
+    printk(KERN_INFO KMSG_PFX "IRQ handler invoked for IRQ #%d.\n", irq);
+
+    if (irqgen_data == NULL) {
+        printk(KERN_ERR KMSG_PFX "irqgen_data is NULL, cannot proceed.\n");
+        return IRQ_NONE;
+    }
 
     // Increment the `count_handled` counter before ACK
     irqgen_data->count_handled++;
+    printk(KERN_INFO KMSG_PFX "Count handled: %u\n", irqgen_data->count_handled);
 
     // Acknowledge the IRQ in the control register
     iowrite32(IRQGEN_CTRL_REG_F_ACK, IRQGEN_CTRL_REG);
@@ -78,9 +82,8 @@ static irqreturn_t irqgen_irqhandler(int irq, void *data)
 /* Enable the IRQ Generator */
 void enable_irq_generator(void)
 {
-#ifdef DEBUG
     printk(KERN_INFO KMSG_PFX "Enabling IRQ Generator.\n");
-#endif
+
     // Enable the IRQ generator by setting the ENABLE bit in the control register
     iowrite32(IRQGEN_CTRL_REG_F_ENABLE, IRQGEN_CTRL_REG);
 }
@@ -88,9 +91,8 @@ void enable_irq_generator(void)
 /* Disable the IRQ Generator */
 void disable_irq_generator(void)
 {
-#ifdef DEBUG
     printk(KERN_INFO KMSG_PFX "Disabling IRQ Generator.\n");
-#endif
+
     // Set to zero the `amount` field, then disable the controller
     iowrite32(0, IRQGEN_GENIRQ_REG);
     iowrite32(0, IRQGEN_CTRL_REG);
@@ -166,12 +168,15 @@ static int32_t __init irqgen_init(void)
     }
 
     /* FIXED: Register the handle to the relevant IRQ number */
+    printk(KERN_INFO KMSG_PFX "Attempting to request IRQ %d\n", IRQGEN_FIRST_IRQ);
     retval = _request_irq(IRQGEN_FIRST_IRQ, irqgen_irqhandler, 0, DRIVER_NAME, &dummy);
     if (retval != 0) {
         printk(KERN_ERR KMSG_PFX "request_irq() failed with return value %d while requesting IRQ id %u.\n",
                 retval, IRQGEN_FIRST_IRQ);
         goto err_request_irq;
     }
+
+    printk(KERN_INFO KMSG_PFX "Successfully registered IRQ handler for IRQ %d\n", IRQGEN_FIRST_IRQ);
 
     retval = irqgen_sysfs_setup();
     if (0 != retval) {
@@ -229,3 +234,4 @@ MODULE_DESCRIPTION("Module for the IRQ Generator IP block for the realtime syste
 MODULE_AUTHOR("Jan Lipponen <jan.lipponen@wapice.com>");
 MODULE_AUTHOR("Nicola Tuveri <nicola.tuveri@tut.fi>");
 MODULE_VERSION("0.2");
+
