@@ -2,8 +2,11 @@
 #define __IRQGEN_ADDRESSES_H
 
 /* IRQ Generator core register address space from devicetree.dts */
-# define IRQGEN_REG_PHYS_BASE 0x43C00000 // FIXED
+# define IRQGEN_REG_PHYS_BASE 0x43c00000 // FIXED
 # define IRQGEN_REG_PHYS_SIZE 0x10000    // FIXED
+
+#define ACK1d 0x0  // Example value for the first interrupt
+#define ACK1e 0x1  // Example value for the second interrupt
 
 /* IRQ Generator register address map from irq_generator_v1_1.pdf */
 # define IRQGEN_CTRL_REG_OFFSET 0x0000 // FIXED

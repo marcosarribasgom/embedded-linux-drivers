@@ -11,6 +11,7 @@
 #include <linux/init.h>             // Macros used to mark up functions e.g., __init __ex
 #include <linux/module.h>           // Core header for loading LKMs into the kernel
 #include <linux/kernel.h>           // Contains types, macros, functions for the kernel
+#include <linux/delay.h>
 
 #include <linux/interrupt.h>        // Interrupt handling functions
 #include <asm/io.h>                 // IO operations
@@ -101,15 +102,23 @@ void disable_irq_generator(void)
 /* Generate specified amount of interrupts on specified IRQ_F2P line [IRQLINES_AMNT-1:0] */
 void do_generate_irqs(uint16_t amount, uint8_t line, uint16_t delay)
 {
-    u32 regvalue = 0
-                   | FIELD_PREP(IRQGEN_GENIRQ_REG_F_AMOUNT,  amount)
-                   | FIELD_PREP(IRQGEN_GENIRQ_REG_F_DELAY,    delay)
-                   | FIELD_PREP(IRQGEN_GENIRQ_REG_F_LINE,      line);
+    // Ensure amount does not exceed a certain limit to prevent flooding
+    if (amount > IRQGEN_MAX_AMOUNT) {
+        printk(KERN_WARNING KMSG_PFX "Requested amount exceeds maximum. Capping at %d.\n", IRQGEN_MAX_AMOUNT);
+        amount = IRQGEN_MAX_AMOUNT;
+    }
 
-    printk(KERN_INFO KMSG_PFX "Generating %u interrupts with IRQ delay %u on line %d.\n",
-           amount, delay, line);
+    // Generate interrupts
+    for (uint16_t i = 0; i < amount; ++i) {
+        u32 regvalue = 0
+                       | FIELD_PREP(IRQGEN_GENIRQ_REG_F_AMOUNT,  1) // Generate 1 interrupt at a time
+                       | FIELD_PREP(IRQGEN_GENIRQ_REG_F_DELAY,   delay)
+                       | FIELD_PREP(IRQGEN_GENIRQ_REG_F_LINE,     line);
 
-    iowrite32(regvalue, IRQGEN_GENIRQ_REG);
+        printk(KERN_INFO KMSG_PFX "Generating interrupt #%d with delay %u on line %d.\n", i + 1, delay, line);
+        iowrite32(regvalue, IRQGEN_GENIRQ_REG);
+        msleep(delay);  // Delay to allow IRQs to settle
+    }
 }
 
 // Returns the latency of last successfully served IRQ, in ns
@@ -192,6 +201,7 @@ static int32_t __init irqgen_init(void)
         do_generate_irqs(generate_irqs, 0, loadtime_irq_delay);
     }
 
+    printk(KERN_INFO KMSG_PFX DRIVER_LNAME "initialized successfully.n\");
     return 0;
 
  err_sysfs_setup:
@@ -233,5 +243,8 @@ MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Module for the IRQ Generator IP block for the realtime systems course");
 MODULE_AUTHOR("Jan Lipponen <jan.lipponen@wapice.com>");
 MODULE_AUTHOR("Nicola Tuveri <nicola.tuveri@tut.fi>");
+MODULE_AUTHOR("Ashfak <mdashfakhaider.nehal@tuni.fi>");
+MODULE_AUTHOR("Marcos <marcos.arribas-gomez@tuni.fi>");
+MODULE_AUTHOR("Asri <mohamed.asri@tuni.fi>");
 MODULE_VERSION("0.2");
 
