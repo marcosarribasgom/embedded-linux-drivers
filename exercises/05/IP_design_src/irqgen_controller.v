@@ -79,3 +79,25 @@ module irqgen_controller#(
         end
     end
 endmodule
+
+module irq_latency_counter(
+    input wire clk,
+    input wire reset,
+    input wire irq,
+    input wire irq_ack,
+    output reg [15:0] irq_latency_counter
+);
+
+always @(posedge clk or posedge reset) begin
+    if (reset) begin
+        irq_latency_counter <= 16'd0;
+    end
+    else if (irq && !irq_ack) begin
+        irq_latency_counter <= irq_latency_counter + 1; // Count while IRQ is active
+    end
+    else if (irq_ack) begin
+        irq_latency_counter <= 16'd0; // Reset on acknowledge
+    end
+end
+
+endmodule
