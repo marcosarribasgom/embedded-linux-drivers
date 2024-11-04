@@ -107,12 +107,13 @@ void do_generate_irqs(uint16_t amount, uint8_t line, uint16_t delay)
 {
     // Ensure amount does not exceed a certain limit to prevent flooding
     if (amount > IRQGEN_MAX_AMOUNT) {
-        printk(KERN_WARNING KMSG_PFX "Requested amount exceeds maximum. Capping at %d.\n", IRQGEN_MAX_AMOUNT);
+        printk(KERN_WARNING KMSG_PFX "Requested amount exceeds maximum. Capping at %lu.\n", IRQGEN_MAX_AMOUNT);
         amount = IRQGEN_MAX_AMOUNT;
     }
 
     // Generate interrupts
-    for (uint16_t i = 0; i < amount; ++i) {
+    uint16_t i;
+    for (i = 0; i < amount; ++i) {
         u32 regvalue = 0
                        | FIELD_PREP(IRQGEN_GENIRQ_REG_F_AMOUNT,  1) // Generate 1 interrupt at a time
                        | FIELD_PREP(IRQGEN_GENIRQ_REG_F_DELAY,   delay)
@@ -205,7 +206,8 @@ static int32_t __init irqgen_init(void)
 	do_generate_irqs(1, 0, 100);
     }
 
-    printk(KERN_INFO KMSG_PFX DRIVER_LNAME "initialized successfully.n\");
+    printk(KERN_INFO KMSG_PFX DRIVER_LNAME "initialized successfully.\n");
+
     return 0;
 
  err_sysfs_setup:
@@ -252,4 +254,3 @@ MODULE_AUTHOR("Ashfak <mdashfakhaider.nehal@tuni.fi>");
 MODULE_AUTHOR("Marcos <marcos.arribas-gomez@tuni.fi>");
 MODULE_AUTHOR("Asri <mohamed.asri@tuni.fi>");
 MODULE_VERSION("0.2");
-
