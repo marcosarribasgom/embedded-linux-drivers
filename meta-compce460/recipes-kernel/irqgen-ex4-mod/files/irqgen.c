@@ -77,6 +77,8 @@ static irqreturn_t irqgen_irqhandler(int irq, void *data)
     // Acknowledge the IRQ in the control register
     iowrite32(IRQGEN_CTRL_REG_F_ACK, IRQGEN_CTRL_REG);
 
+    msleep(10);
+
     return IRQ_HANDLED; // FIXED: Returning IRQ_HANDLED on completion
 }
 
@@ -87,6 +89,7 @@ void enable_irq_generator(void)
 
     // Enable the IRQ generator by setting the ENABLE bit in the control register
     iowrite32(IRQGEN_CTRL_REG_F_ENABLE, IRQGEN_CTRL_REG);
+    printk(KERN_INFO KMSG_PFX "Enable bit set.\n");
 }
 
 /* Disable the IRQ Generator */
@@ -198,7 +201,8 @@ static int32_t __init irqgen_init(void)
 
     if (generate_irqs > 0) {
         /* Generate IRQs (amount, line, delay) */
-        do_generate_irqs(generate_irqs, 0, loadtime_irq_delay);
+        // do_generate_irqs(generate_irqs, 0, loadtime_irq_delay);
+	do_generate_irqs(1, 0, 100);
     }
 
     printk(KERN_INFO KMSG_PFX DRIVER_LNAME "initialized successfully.n\");
@@ -219,6 +223,7 @@ static int32_t __init irqgen_init(void)
 // The kernel module exit function
 static void __exit irqgen_exit(void)
 {
+    disable_irq_generator();
     // Read interrupt latency from the IRQ Generator on exit
     printk(KERN_INFO KMSG_PFX "IRQ count: generated since reboot %u, handled since load %u.\n",
            irqgen_read_count(), irqgen_data->count_handled);
@@ -226,7 +231,7 @@ static void __exit irqgen_exit(void)
     printk(KERN_INFO KMSG_PFX "latency for last handled IRQ: %lluns.\n",
            irqgen_read_latency());
 
-    disable_irq_generator();
+   // disable_irq_generator();
 
     irqgen_sysfs_cleanup();
     free_irq(IRQGEN_FIRST_IRQ, &dummy);
