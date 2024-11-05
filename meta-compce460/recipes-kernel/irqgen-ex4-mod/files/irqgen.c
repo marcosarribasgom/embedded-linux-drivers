@@ -204,8 +204,13 @@ static int32_t __init irqgen_init(void)
         /* Generate IRQs (amount, line, delay) */
         // do_generate_irqs(generate_irqs, 0, loadtime_irq_delay);
 	do_generate_irqs(1, 0, 100);
-    }
+    }	
 
+    retval = sysfs_create_file(kernel_kobj, &latency_attr.attr);
+    if (retval) {
+   	 printk(KERN_ERR KMSG_PFX "Failed to create sysfs file for latency.\n");
+   	 goto err_sysfs_latency;
+	}
     printk(KERN_INFO KMSG_PFX DRIVER_LNAME "initialized successfully.\n");
 
     return 0;
@@ -239,6 +244,8 @@ static void __exit irqgen_exit(void)
     free_irq(IRQGEN_FIRST_IRQ, &dummy);
     iounmap(irqgen_reg_base);
     kfree(irqgen_data);
+
+    sysfs_remove_file(kernel_kobj, &latency_attr.attr);
 
     printk(KERN_INFO KMSG_PFX DRIVER_LNAME " exiting.\n");
 }
