@@ -139,19 +139,6 @@ u32 irqgen_read_count(void)
     return ioread32(IRQGEN_IRQ_COUNT_REG);
 }
 
-// Debugging wrapper for request_irq()
-#ifdef DEBUG
-static
-int _request_irq(unsigned int _irq, irq_handler_t _handler, unsigned long _flags, const char *_name, void *_dev)
-{
-    printk(KERN_DEBUG KMSG_PFX "request_irq(%u, %p, %lu, %s, %p)\n",
-            _irq, _handler, _flags, _name, _dev);
-    return request_irq(_irq, _handler, _flags, _name, _dev);
-}
-#else
-# define _request_irq request_irq
-#endif
-
 // The kernel module init function
 static int32_t __init irqgen_init(void)
 {
@@ -180,9 +167,9 @@ static int32_t __init irqgen_init(void)
         goto err_ioremap;
     }
 
-    /* FIXED: Register the handle to the relevant IRQ number */
+    /* Use request_irq directly */
     printk(KERN_INFO KMSG_PFX "Attempting to request IRQ %d\n", IRQGEN_FIRST_IRQ);
-    retval = _request_irq(IRQGEN_FIRST_IRQ, irqgen_irqhandler, 0, DRIVER_NAME, &dummy);
+    retval = request_irq(IRQGEN_FIRST_IRQ, irqgen_irqhandler, 0, DRIVER_NAME, &dummy);
     if (retval != 0) {
         printk(KERN_ERR KMSG_PFX "request_irq() failed with return value %d while requesting IRQ id %u.\n",
                 retval, IRQGEN_FIRST_IRQ);
@@ -203,14 +190,9 @@ static int32_t __init irqgen_init(void)
     if (generate_irqs > 0) {
         /* Generate IRQs (amount, line, delay) */
         // do_generate_irqs(generate_irqs, 0, loadtime_irq_delay);
-	do_generate_irqs(1, 0, 100);
-    }	
+        do_generate_irqs(1, 0, 100);
+    }
 
-    retval = sysfs_create_file(kernel_kobj, &latency_attr.attr);
-    if (retval) {
-   	 printk(KERN_ERR KMSG_PFX "Failed to create sysfs file for latency.\n");
-   	 goto err_sysfs_latency;
-	}
     printk(KERN_INFO KMSG_PFX DRIVER_LNAME "initialized successfully.\n");
 
     return 0;
@@ -238,14 +220,10 @@ static void __exit irqgen_exit(void)
     printk(KERN_INFO KMSG_PFX "latency for last handled IRQ: %lluns.\n",
            irqgen_read_latency());
 
-   // disable_irq_generator();
-
     irqgen_sysfs_cleanup();
     free_irq(IRQGEN_FIRST_IRQ, &dummy);
     iounmap(irqgen_reg_base);
     kfree(irqgen_data);
-
-    sysfs_remove_file(kernel_kobj, &latency_attr.attr);
 
     printk(KERN_INFO KMSG_PFX DRIVER_LNAME " exiting.\n");
 }
@@ -261,3 +239,4 @@ MODULE_AUTHOR("Ashfak <mdashfakhaider.nehal@tuni.fi>");
 MODULE_AUTHOR("Marcos <marcos.arribas-gomez@tuni.fi>");
 MODULE_AUTHOR("Asri <mohamed.asri@tuni.fi>");
 MODULE_VERSION("0.2");
+
