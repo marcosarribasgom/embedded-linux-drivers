@@ -18,13 +18,12 @@
 #include <asm/io.h>                 // IO operations
 #include <linux/slab.h>             // Kernel slab allocator
 
-
 #include "irqgen.h"                 // Shared module specific declarations
 
-#define PROP_COMPATIBLE "" // FIXME: compatible property for the irqgen device from the devicetree
-#define PROP_WAPICE_INTRACK "" // FIXME: custom intrack property from the devicetree
+#define PROP_COMPATIBLE "wapice,irq-gen" // FIXED: compatible property for the irqgen device from the devicetree
+#define PROP_WAPICE_INTRACK "wapice,intrack" // FIXED: custom intrack property from the devicetree
 
-#define FPGA_CLOCK_NS   0 /* 1000 / FPGA_CLOCK_MHZ */ // FIXME: how many nanoseconds is a FPGA clock cycle?
+#define FPGA_CLOCK_NS   10 /* 1000 / FPGA_CLOCK_MHZ */ // FIXED: how many nanoseconds is a FPGA clock cycle?
 
 // Kernel token address to access the IRQ Generator core register
 void __iomem *irqgen_reg_base = NULL;
@@ -32,8 +31,24 @@ void __iomem *irqgen_reg_base = NULL;
 // Module data instance
 struct irqgen_data *irqgen_data = NULL;
 
-// Platform driver structure (initialized at the end of the file)
-static struct platform_driver irqgen_pdriver;
+/* Added */
+// Define of_device_id structure
+static const struct of_device_id irqgen_of_match[] = {
+    { .compatible = PROP_COMPATIBLE },
+    {},
+};
+
+// Define platform driver structure
+static struct platform_driver irqgen_pdriver = {
+    .driver = {
+        .name = "irqgen",
+        .of_match_table = irqgen_of_match,
+    },
+    .probe = irqgen_probe,
+    .remove = irqgen_remove,
+};
+MODULE_DEVICE_TABLE(of, irqgen_of_match);
+/* Added */
 
 /* vvvv ---- LKM Parameters vvvv ---- */
 static unsigned int generate_irqs = 0;
@@ -66,8 +81,8 @@ static int parse_parameters(void)
 // Returns the latency of last successfully served IRQ, in clock cycles
 static inline u32 irqgen_read_latency_clk(void)
 {
-    // FIXME: copy implementation from your EX04 solution
-    return 0;
+    // FIXED: copy implementation from your EX04 solution
+    return ioread32(IRQGEN_LATENCY_REG); 
 }
 
 static irqreturn_t irqgen_irqhandler(int irq, void *data)
@@ -80,8 +95,8 @@ static irqreturn_t irqgen_irqhandler(int irq, void *data)
                 | FIELD_PREP(IRQGEN_CTRL_REG_F_HANDLED, 1)
                 | FIELD_PREP(IRQGEN_CTRL_REG_F_ACK, (ack));
 
-    ++irqgen_data->total_handled;
-    ++irqgen_data->intr_handled[idx];
+    irqgen_data->total_handled++;
+    irqgen_data->intr_handled[idx]++;
 
 # ifdef DEBUG
     printk(KERN_INFO KMSG_PFX "IRQ #%d (idx: %d) received (ACK 0x%0X).\n", irq, idx, ack);
@@ -98,22 +113,23 @@ static irqreturn_t irqgen_irqhandler(int irq, void *data)
 /* Enable the IRQ Generator */
 void enable_irq_generator(void)
 {
-    // FIXME: copy implementation from your EX04 solution
+    // FIXED: copy implementation from your EX04 solution
+    iowrite32(IRQGEN_CTRL_ENABLE, IRQGEN_CTRL_REG); 
 }
 
 /* Disable the IRQ Generator */
 void disable_irq_generator(void)
 {
-    // FIXME: copy implementation from your EX04 solution
+    // FIXED: copy implementation from your EX04 solution
+    iowrite32(IRQGEN_CTRL_DISABLE, IRQGEN_CTRL_REG); 
 }
 
 /* Generate specified amount of interrupts on specified IRQ_F2P line [IRQLINES_AMNT-1:0] */
 void do_generate_irqs(uint16_t amount, uint8_t line, uint16_t delay)
 {
-    u32 regvalue = 0
-                   | FIELD_PREP(IRQGEN_GENIRQ_REG_F_AMOUNT,  amount)
-                   | FIELD_PREP(IRQGEN_GENIRQ_REG_F_DELAY,    delay)
-                   | FIELD_PREP(IRQGEN_GENIRQ_REG_F_LINE,      line);
+    u32 regvalue = FIELD_PREP(IRQGEN_GENIRQ_REG_F_AMOUNT, amount) |
+                   FIELD_PREP(IRQGEN_GENIRQ_REG_F_DELAY, delay) |
+                   FIELD_PREP(IRQGEN_GENIRQ_REG_F_LINE, line);
 
     printk(KERN_INFO KMSG_PFX "Generating %u interrupts with IRQ delay %u on line %d.\n",
            amount, delay, line);
@@ -167,92 +183,62 @@ static int irqgen_probe(struct platform_device *pdev)
     int i;
     struct resource *iomem_range = NULL;
 
-    // FIXME: use DEVM_KZALLOC_HELPER to dinamically allocate irqgen_data (the pointers inside the structure will need separate allocations)
+    // FIXED: use DEVM_KZALLOC_HELPER to dinamically allocate irqgen_data (the pointers inside the structure will need separate allocations)
+    DEVM_KZALLOC_HELPER(irqgen_data, pdev, 1, GFP_KERNEL);
 
-    // FIXME: platform_get_resource() (and error checking)
+    // FIXED: platform_get_resource() (and error checking)
+    iomem_range = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+    if (!iomem_range) {
+        printk(KERN_ERR KMSG_PFX "Failed to get IOMEM resource.\n");
+        retval = -ENODEV;
+        goto err;
+    }
 
-    // FIXME: devm_ioremap_resource() (and error checking)
+    // FIXED: devm_ioremap_resource() (and error checking)
+    irqgen_reg_base = devm_ioremap_resource(&pdev->dev, iomem_range);
+    if (IS_ERR(irqgen_reg_base)) {
+        retval = PTR_ERR(irqgen_reg_base);
+        printk(KERN_ERR KMSG_PFX "Failed to map IOMEM resource.\n");
+        goto err;
+    }
 
-#if 0 // FIXME: enable
     irqs_count = platform_irq_count(pdev);
     irqs_acks = of_property_count_u32_elems(pdev->dev.of_node, PROP_WAPICE_INTRACK);
 
-    if (irqs_count <= 0) {
-        printk(KERN_ERR KMSG_PFX
-               "No IRQ ID entries found for the device.\n");
-        retval = -ENODEV;
-        goto err;
-    } else if (irqs_acks < 0) {
-        printk(KERN_ERR KMSG_PFX
-               "Property \"%s\" not found for the device.\n",
-               PROP_WAPICE_INTRACK);
-        retval = irqs_acks;
-        goto err;
-    } else if (irqs_count != irqs_acks) {
-        printk(KERN_ERR KMSG_PFX
-               "Property \"%s\" has invalid lenght (!= %d).\n",
-               PROP_WAPICE_INTRACK, irqs_count);
+    if (irqs_count <= 0 || irqs_acks < 0 || irqs_count != irqs_acks) {
         retval = -EINVAL;
         goto err;
     }
 
-    DEVM_KZALLOC_HELPER(irqgen_data->intr_ids,
-                        pdev, irqs_count, GFP_KERNEL);
-    DEVM_KZALLOC_HELPER(irqgen_data->intr_idx,
-                        pdev, irqs_count, GFP_KERNEL);
-    DEVM_KZALLOC_HELPER(irqgen_data->intr_acks,
-                        pdev, irqs_count, GFP_KERNEL);
-    DEVM_KZALLOC_HELPER(irqgen_data->intr_handled,
-                        pdev, irqs_count, GFP_KERNEL);
+    DEVM_KZALLOC_HELPER(irqgen_data->intr_ids, pdev, irqs_count, GFP_KERNEL);
+    DEVM_KZALLOC_HELPER(irqgen_data->intr_idx, pdev, irqs_count, GFP_KERNEL);
+    DEVM_KZALLOC_HELPER(irqgen_data->intr_acks, pdev, irqs_count, GFP_KERNEL);
+    DEVM_KZALLOC_HELPER(irqgen_data->intr_handled, pdev, irqs_count, GFP_KERNEL);
 
     irqgen_data->line_count = irqs_count;
-    retval = of_property_read_u32_array(/* FIXME */);
-    if (retval) {
-        printk(KERN_ERR KMSG_PFX
-               "Failed to read interrupt ack values from the device tree with %d.\n",
-               retval);
+    retval = of_property_read_u32_array(pdev->dev.of_node, PROP_WAPICE_INTRACK, irqgen_data->intr_acks, irqs_count);
+    if (retval)
         goto err;
-    }
 
-    for (i=0; i<irqs_count; ++i) {
+    for (i = 0; i < irqs_count; ++i) {
         int irq_id = platform_get_irq(pdev, i);
-
-        if (irq_id < 0) { // no valid IRQ ID
+        if (irq_id < 0) {
             retval = irq_id;
-            if (i == 0) {
-                printk(KERN_ERR KMSG_PFX
-                       "No IRQ ID entries found for the device.\n");
-                retval = -ENODEV;
-            } else {
-                printk(KERN_ERR KMSG_PFX
-                       "Invalid IRQ ID entry for the device at index %d.\n",
-                       i);
-            }
             goto err;
         }
-
         irqgen_data->intr_ids[i] = irq_id;
         irqgen_data->intr_idx[i] = i;
 
-        /* Register the handle to the relevant IRQ number and the corresponding idx value */
-        retval = _devm_request_irq(/* FIXME */);
-        if (retval != 0) {
-            printk(KERN_ERR KMSG_PFX
-                   "devm_request_irq() failed with return value %d "
-                   "while requesting IRQ id %u.\n",
-                   retval, irq_id);
+        retval = _devm_request_irq(&pdev->dev, irq_id, irqgen_irqhandler, 0, "irqgen", &irqgen_data->intr_idx[i]);
+        if (retval != 0)
             goto err;
-        }
     }
 
     retval = irqgen_sysfs_setup(pdev);
-    if (0 != retval) {
-        printk(KERN_ERR KMSG_PFX "Sysfs setup failed.\n");
+    if (retval)
         goto err_sysfs_setup;
-    }
 
     return 0;
-#endif
 
  /* HINT: We are using devm_ resources: do we need to free them? */
  err_sysfs_setup:
@@ -263,8 +249,8 @@ static int irqgen_probe(struct platform_device *pdev)
 
 static int irqgen_remove(struct platform_device *pdev)
 {
-    //irqgen_sysfs_cleanup(pdev); // FIXME: enable
-
+    //irqgen_sysfs_cleanup(pdev); // FIXED: enable
+    irqgen_sysfs_cleanup(pdev);
     return 0;
 }
 
@@ -281,7 +267,12 @@ static int32_t __init irqgen_init(void)
         goto err_parse_parameters;
     }
 
-    // FIXME: something is missing here
+    // FIXED: something is missing here
+    retval = platform_driver_register(&irqgen_pdriver);
+    if (retval) {
+        printk(KERN_ERR KMSG_PFX "platform_driver_register() failed\n");
+        return retval;
+    }
 
     /* Enable the IRQ Generator */
     enable_irq_generator();
@@ -312,13 +303,11 @@ static void __exit irqgen_exit(void)
     /* Disable the IRQ Generator */
     disable_irq_generator();
 
-    /* FIXME: Unregister the platform driver and associated resources */
+    /* FIXED: Unregister the platform driver and associated resources */
+    platform_driver_unregister(&irqgen_pdriver);
 
     printk(KERN_INFO KMSG_PFX DRIVER_LNAME " exiting.\n");
 }
-
-
-
 
 
 // FIXME: glue together the platform driver and the device-tree (use PROP_COMPATIBLE)
@@ -329,7 +318,10 @@ module_exit(irqgen_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Module for the IRQ Generator IP block for the realtime systems course");
-// FIXME: add yourself among the authors
+// FIXED: add yourself among the authors
+MODULE_AUTHOR("Ashfak <mdashfakhaider.nehal@tuni.fi>");
+MODULE_AUTHOR("Marcos <marcos.arribas-gomez@tuni.fi>");
+MODULE_AUTHOR("Asri <mohamed.asri@tuni.fi>");
 MODULE_AUTHOR("Jan Lipponen <jan.lipponen@wapice.com>");
 MODULE_AUTHOR("Nicola Tuveri <nicola.tuveri@tut.fi>");
 MODULE_VERSION("0.6");
