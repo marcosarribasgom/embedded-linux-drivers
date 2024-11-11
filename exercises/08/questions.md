@@ -10,7 +10,7 @@
 
 ## 5. Compare the results of questions 2 and 4; do they differ significantly? why?
 
-## 6. Compare the plots for the 6 different profiles. Describe each of them and compare them?
+## 6. Compare the 6 different profiles according to all plots generated.
 
 ## 7. Document the RT performance differences and their reasons
 

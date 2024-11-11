@@ -47,7 +47,7 @@ The username and (very secure) password for the VM account are: `student`/`stude
 - [ ] Answer questions 3, 4 and 5
 - Enable local network [connection](lab_nic_setup.md)
 - Familiarize with the contents of [scripts/](./scripts/)
-- Run [scripts/testandplot.sh](scripts/testandplot.sh) in the following scenarios (for each save the csv, the metadata and the plot in the repository. You might want to reboot the PYNQ board in-between runs):
+- Run [scripts/testandplot.sh](scripts/testandplot.sh) in the following scenarios (for each save the csv (named `latencies_no-RT_no-t.csv`, `latencies_RT_no-t.csv`, `latencies_RT-tuned_no-t.csv` for the  results with no torture and `latencies_no-RT_t.csv`, `latencies_RT_t.csv`, `latencies_RT-tuned_t.csv` with torture), the metadata and the plot in the repository. You might want to reboot the PYNQ board in-between runs):
   - no-RT Linux, delay=0, no torture
   - no-RT Linux, delay=0, torture
   - RT Linux, delay=0, no torture
@@ -55,8 +55,10 @@ The username and (very secure) password for the VM account are: `student`/`stude
 - After this, tune the RT-system using the information in [scripts/README.txt](scripts/README.txt), and rerun:
   - RT Linux, delay=0, no torture
   - RT Linux, delay=0, torture
+- The VM is missing a few python libraries, so make sure to run `pip3 install --upgrade pip`, then `pip3 install numpy`, and then `pip3 install matplotlib` before doing the next phase
+- Make sure all csv-files are available in the scripts folder, correctly named, and then run the `./latency_distribution_plot.py` script
 - Answer questions 6 & 7
-- Prepare a slide presentation, including the 6 plots above: the demo will consist in a few questions about comparing the results (add this presentation as a PDF in this same folder)
+- Prepare a slide presentation, including the 6 plots above from running testandplot and the two latency distribution plots: the demo will consist in a few questions about comparing the results (add this presentation as a PDF in this same folder)
 - [ ] <u>**remember to push all your commits to your remote repository**</u>
 - [ ] <u>remember to recover your microSD card before leaving and restoring the original network cable setup</u>
 
