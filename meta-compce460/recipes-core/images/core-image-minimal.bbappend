@@ -1,6 +1,6 @@
 # imported and base recipes
 IMAGE_INSTALL_append = "\
-        irqgen-ex4-mod \
+        irqgen-mod \
         "
 
 inherit kernel-fitimage
