@@ -13,7 +13,6 @@
 #include <linux/slab.h>             // Kernel slab allocator
 #include "irqgen.h"                 // Shared module specific declarations
 
-#define DRIVER_NAME "irqgen"
 #define PROP_COMPATIBLE "wapice,irq-gen" // Compatible property for device tree matching
 #define PROP_WAPICE_INTRACK "wapice,intrack" // Custom intrack property from device tree
 
@@ -22,8 +21,8 @@
 #define IRQGEN_CTRL_DISABLE 0x0 // Replace 0x0 with the actual disable value
 
 
-int irqgen_probe(struct platform_device *pdev);
-int irqgen_remove(struct platform_device *pdev);
+static int irqgen_probe(struct platform_device *pdev);
+static int irqgen_remove(struct platform_device *pdev);
 
 
 // Kernel token address to access the IRQ Generator core register
@@ -155,19 +154,28 @@ static int irqgen_probe(struct platform_device *pdev)
     if (!iomem_range) {
         dev_err(&pdev->dev, "Failed to get IOMEM resource.\n");
         return -ENODEV;
+	goto err;
     }
 
     irqgen_reg_base = devm_ioremap_resource(&pdev->dev, iomem_range);
     if (IS_ERR(irqgen_reg_base)) {
         dev_err(&pdev->dev, "Failed to map IOMEM resource.\n");
         return PTR_ERR(irqgen_reg_base);
-    }
+	goto err;
+    } else {
+    printk(KERN_INFO KMSG_PFX "Mapped irqgen_reg_base at virtual address: %p\n", irqgen_reg_base);
+	}
 
     irqs_count = platform_irq_count(pdev);
     irqs_acks = of_property_count_u32_elems(pdev->dev.of_node, PROP_WAPICE_INTRACK);
-
+    if (irqs_acks < 0) {
+    dev_err(&pdev->dev, "Failed to read property 'wapice,intrack', error: %d\n", irqs_acks);
+    return -EINVAL;
+	}
     if (irqs_count <= 0 || irqs_acks < 0 || irqs_count != irqs_acks) {
-        return -EINVAL;
+        dev_err(&pdev->dev, "Invalid IRQ configuration: irqs_count=%d, irqs_acks=%d\n", irqs_count, irqs_acks);
+	return -EINVAL;
+	goto err;
     }
 
     // Allocate necessary arrays in irqgen_data structure
@@ -178,28 +186,40 @@ static int irqgen_probe(struct platform_device *pdev)
 
     irqgen_data->line_count = irqs_count;
     retval = of_property_read_u32_array(pdev->dev.of_node, PROP_WAPICE_INTRACK, irqgen_data->intr_acks, irqs_count);
-    if (retval)
+    
+    if (retval) {
         return retval;
+	goto err;
+    }
 
-	int i;
+    int i;
     for (i = 0; i < irqs_count; ++i) {
         int irq_id = platform_get_irq(pdev, i);
-        if (irq_id < 0)
-            return irq_id;
-        
+        if (irq_id < 0) {
+            retval = irq_id;
+            goto err;
+        }
+
         irqgen_data->intr_ids[i] = irq_id;
         irqgen_data->intr_idx[i] = i;
 
-        retval = devm_request_irq(&pdev->dev, irq_id, irqgen_irqhandler, IRQF_SHARED, DRIVER_NAME, &irqgen_data->intr_idx[i]);
-        if (retval != 0)
-            return retval;
+        retval = devm_request_irq(&pdev->dev, irq_id, irqgen_irqhandler, 0, DRIVER_NAME, &irqgen_data->intr_idx[i]);
+        if (retval != 0) {
+            goto err;
+        }
     }
 
     retval = irqgen_sysfs_setup(pdev);
-    if (retval)
-        return retval;
+    if (retval) {
+        goto err;
+    }
 
     return 0;
+
+err:
+    printk(KERN_ERR KMSG_PFX "probe() failed\n");
+    return retval;
+
 }
 
 // Platform Driver Remove Function

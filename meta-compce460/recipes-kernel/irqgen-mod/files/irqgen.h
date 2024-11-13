@@ -3,17 +3,22 @@
 
 #include <linux/platform_device.h>  // Platform device related functions
 
+
+#ifndef DRIVER_NAME                
 #ifdef DEBUG
 # define DRIVER_NAME "irqgen_dbg"
+#else
+# define DRIVER_NAME "irqgen"
+#endif
+#endif
+
+#ifdef DEBUG
 # define DRIVER_LNAME "IRQ Generator module (DEBUG build)"
 # define KMSG_PFX "IRQGEN_DBG: "
 #else
-# define DRIVER_NAME "irqgen"
 # define DRIVER_LNAME "IRQ Generator module"
 # define KMSG_PFX "IRQGEN: "
-
 #endif
-
 /*-
  * Structure for module data
  *
