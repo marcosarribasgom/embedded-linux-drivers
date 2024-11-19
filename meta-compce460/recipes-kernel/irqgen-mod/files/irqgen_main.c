@@ -149,49 +149,62 @@ static int irqgen_probe(struct platform_device *pdev)
 
     // Allocate irqgen_data structure dynamically
     DEVM_KZALLOC_HELPER(irqgen_data, pdev, 1, GFP_KERNEL);
+    if (!irqgen_data) {
+        dev_err(&pdev->dev, "Failed to allocate memory for irqgen_data.\n");
+        retval = -ENOMEM;
+        goto err;
+    }
 
+    // Get memory resource for the IRQ Generator
     iomem_range = platform_get_resource(pdev, IORESOURCE_MEM, 0);
     if (!iomem_range) {
         dev_err(&pdev->dev, "Failed to get IOMEM resource.\n");
-        return -ENODEV;
-	goto err;
+        retval = -ENODEV;
+        goto err;
     }
 
+    // Map the memory range for the IRQ Generator
     irqgen_reg_base = devm_ioremap_resource(&pdev->dev, iomem_range);
     if (IS_ERR(irqgen_reg_base)) {
         dev_err(&pdev->dev, "Failed to map IOMEM resource.\n");
-        return PTR_ERR(irqgen_reg_base);
-	goto err;
+        retval = PTR_ERR(irqgen_reg_base);
+        goto err;
     } else {
-    printk(KERN_INFO KMSG_PFX "Mapped irqgen_reg_base at virtual address: %p\n", irqgen_reg_base);
-	}
+        printk(KERN_INFO KMSG_PFX "Mapped irqgen_reg_base at virtual address: %p\n", irqgen_reg_base);
+    }
 
+    // Get the number of IRQs and ACK values from the device tree
     irqs_count = platform_irq_count(pdev);
     irqs_acks = of_property_count_u32_elems(pdev->dev.of_node, PROP_WAPICE_INTRACK);
     if (irqs_acks < 0) {
-    dev_err(&pdev->dev, "Failed to read property 'wapice,intrack', error: %d\n", irqs_acks);
-    return -EINVAL;
-	}
-    if (irqs_count <= 0 || irqs_acks < 0 || irqs_count != irqs_acks) {
-        dev_err(&pdev->dev, "Invalid IRQ configuration: irqs_count=%d, irqs_acks=%d\n", irqs_count, irqs_acks);
-	return -EINVAL;
-	goto err;
+        dev_err(&pdev->dev, "Failed to read property 'wapice,intrack', error: %d\n", irqs_acks);
+        retval = -EINVAL;
+        goto err;
     }
 
-    // Allocate necessary arrays in irqgen_data structure
+    // Validate IRQ count and ACK count
+    if (irqs_count <= 0 || irqs_acks <= 0 || irqs_count != irqs_acks) {
+        dev_err(&pdev->dev, "Invalid IRQ configuration: irqs_count=%d, irqs_acks=%d\n", irqs_count, irqs_acks);
+        retval = -EINVAL;
+        goto err;
+    }
+
+    // Allocate arrays for IRQ IDs, indexes, ACK values, and handled counts
     DEVM_KZALLOC_HELPER(irqgen_data->intr_ids, pdev, irqs_count, GFP_KERNEL);
     DEVM_KZALLOC_HELPER(irqgen_data->intr_idx, pdev, irqs_count, GFP_KERNEL);
     DEVM_KZALLOC_HELPER(irqgen_data->intr_acks, pdev, irqs_count, GFP_KERNEL);
     DEVM_KZALLOC_HELPER(irqgen_data->intr_handled, pdev, irqs_count, GFP_KERNEL);
 
     irqgen_data->line_count = irqs_count;
+
+    // Read ACK values from device tree
     retval = of_property_read_u32_array(pdev->dev.of_node, PROP_WAPICE_INTRACK, irqgen_data->intr_acks, irqs_count);
-    
     if (retval) {
-        return retval;
-	goto err;
+        dev_err(&pdev->dev, "Failed to read 'wapice,intrack' property\n");
+        goto err;
     }
 
+    // Iterate through IRQ lines and register interrupt handlers
     int i;
     for (i = 0; i < irqs_count; ++i) {
         int irq_id = platform_get_irq(pdev, i);
@@ -205,22 +218,42 @@ static int irqgen_probe(struct platform_device *pdev)
 
         retval = devm_request_irq(&pdev->dev, irq_id, irqgen_irqhandler, 0, DRIVER_NAME, &irqgen_data->intr_idx[i]);
         if (retval != 0) {
+            dev_err(&pdev->dev, "Failed to request IRQ #%d\n", irq_id);
             goto err;
         }
     }
 
+    // Setup sysfs entries for the device
     retval = irqgen_sysfs_setup(pdev);
     if (retval) {
+        dev_err(&pdev->dev, "Failed to set up sysfs\n");
         goto err;
     }
 
+    printk(KERN_INFO KMSG_PFX "IRQGen probe successful\n");
     return 0;
 
 err:
     printk(KERN_ERR KMSG_PFX "probe() failed\n");
+    // Release any previously allocated resources in case of error
+    if (irqgen_data) {
+        if (irqgen_data->intr_ids) {
+            devm_kfree(&pdev->dev, irqgen_data->intr_ids);
+        }
+        if (irqgen_data->intr_idx) {
+            devm_kfree(&pdev->dev, irqgen_data->intr_idx);
+        }
+        if (irqgen_data->intr_acks) {
+            devm_kfree(&pdev->dev, irqgen_data->intr_acks);
+        }
+        if (irqgen_data->intr_handled) {
+            devm_kfree(&pdev->dev, irqgen_data->intr_handled);
+        }
+        devm_kfree(&pdev->dev, irqgen_data);
+    }
     return retval;
-
 }
+
 
 // Platform Driver Remove Function
 static int irqgen_remove(struct platform_device *pdev)

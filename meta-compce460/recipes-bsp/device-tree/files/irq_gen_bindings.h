@@ -3,5 +3,4 @@
  */
 
 // ACK values for level type interrupt handling per IRQ line
-#define ACK1d 0x0
-#define ACK1e 0x1
+#define ACK1d 0x0  // ACK value for interrupt line 1
