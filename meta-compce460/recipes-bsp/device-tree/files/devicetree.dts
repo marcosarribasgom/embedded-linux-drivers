@@ -438,12 +438,12 @@
 			timeout-sec = <0xa>;
 		};
 		
-		irq_gen@43C00000 {
+		irq_gen@43c00000 {
 			compatible = "wapice,irq-gen";
 			interrupt-parent = <0x4>;
 			#interrupt-cells = <0x3>;
-			interrupts = <0x0 0x1d 0x4>;
-			wapice,intrack = <0x0>;
+			interrupts = <0x0 0x2D 0x4>;
+			wapice,intrack = <0x0 0x1>
 			reg = <0x43c00000 0x10000>;
 		};
 	};
