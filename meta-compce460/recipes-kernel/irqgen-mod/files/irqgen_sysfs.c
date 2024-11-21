@@ -107,8 +107,7 @@ IRQGEN_ATTR_RO(intr_handled);
 static ssize_t count_register_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
     u32 val = irqgen_read_count();
-    return sprintf(buf, "%u\n", val);  // Changed from %lu to %u
-
+    return sprintf(buf, "%lu\n", val);
 }
 IRQGEN_ATTR_RO(count_register);
 
@@ -129,7 +128,7 @@ static ssize_t enabled_show(struct device *dev, struct device_attribute *attr, c
 {
     u32 regvalue = ioread32(IRQGEN_CTRL_REG);
     u8 val = FIELD_GET(IRQGEN_CTRL_REG_F_ENABLE, regvalue);
-    return sprintf(buf, "%lu\n", (unsigned long)val);
+    return sprintf(buf, "%u\n", val);
 }
 static ssize_t enabled_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
@@ -253,4 +252,5 @@ void irqgen_sysfs_cleanup(struct platform_device *pdev)
 {
     sysfs_remove_groups(PARENT_KOBJ, irqgen_attr_groups);
 }
+
 
