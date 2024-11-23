@@ -449,7 +449,7 @@
    		    wapice,intrack = <ACK1d ACK1e ACK1f ACK20>; // ACK values
 		    reg = <0x43c00000 0x10000>;        // Base address and memory size
 		};
-
+};
 
 	chosen {
 		bootargs = "console=ttyPS0,115200 root=/dev/mmcblk0p2 rw earlyprintk rootfstype=ext4 rootwait devtmpfs.mount=1";

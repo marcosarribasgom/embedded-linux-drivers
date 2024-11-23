@@ -22,7 +22,7 @@
 #include "irqgen.h"                 // Shared module specific declarations
 
 #define PROP_COMPATIBLE "wapice,irq-gen" // FIXME: compatible property for the irqgen device from the devicetree
-#define PROP_WAPICE_INTRACK "waoice,intrack" // FIXME: custom intrack property from the devicetree
+#define PROP_WAPICE_INTRACK "wapice,intrack" // FIXME: custom intrack property from the devicetree
 
 #define FPGA_CLOCK_NS   10 /* 1000 / FPGA_CLOCK_MHZ */ // FIXME: how many nanoseconds is a FPGA clock cycle?
 
