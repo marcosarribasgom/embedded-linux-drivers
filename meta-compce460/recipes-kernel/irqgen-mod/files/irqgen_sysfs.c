@@ -70,20 +70,25 @@ IRQGEN_ATTR_RO(intr_acks);
 
 static ssize_t intr_handled_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-    ssize_t ret=0, acc=0;
+    unsigned long flags;
+    ssize_t ret = 0, acc = 0;
     int i;
 
-    for (i=0; i<irqgen_data->line_count; ++i) {
-        u32 v;
+    /* Protect access to shared data */
+    spin_lock_irqsave(&irqgen_data->lock, flags);
 
-        v = irqgen_data->intr_handled[i]; // TODO: protect concurrent accesses to r/w shared members of irqge_data
-
-        ret = sprintf(buf+acc, "%u ", v);
+    for (i = 0; i < irqgen_data->line_count; ++i) {
+        u32 v = irqgen_data->intr_handled[i];
+        ret = sprintf(buf + acc, "%u ", v);
         acc += ret;
     }
-    *(buf+acc-1)='\n';
+
+    spin_unlock_irqrestore(&irqgen_data->lock, flags);
+
+    *(buf + acc - 1) = '\n';
     return acc;
 }
+
 IRQGEN_ATTR_RO(intr_handled);
 
 static ssize_t count_register_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -102,12 +107,17 @@ IRQGEN_ATTR_RO(latency);
 
 static ssize_t total_handled_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-    u32 v;
+    unsigned long flags;
+    u32 value;
 
-    v = irqgen_data->total_handled; // TODO: protect concurrent accesses to r/w shared members of irqge_data
+    /* Protect access to shared data */
+    spin_lock_irqsave(&irqgen_data->lock, flags);
+    value = irqgen_data->total_handled;
+    spin_unlock_irqrestore(&irqgen_data->lock, flags);
 
-    return sprintf(buf, "%u\n", v);
+    return sprintf(buf, "%u\n", value);
 }
+
 IRQGEN_ATTR_RO(total_handled);
 
 static ssize_t enabled_show(struct device *dev, struct device_attribute *attr, char *buf)
