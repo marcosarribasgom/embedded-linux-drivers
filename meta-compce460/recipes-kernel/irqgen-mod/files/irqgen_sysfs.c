@@ -253,3 +253,4 @@ void irqgen_sysfs_cleanup(struct platform_device *pdev)
     sysfs_remove_groups(PARENT_KOBJ, irqgen_attr_groups);
 }
 
+

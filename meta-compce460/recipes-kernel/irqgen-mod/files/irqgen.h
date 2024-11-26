@@ -56,3 +56,4 @@ int irqgen_sysfs_setup(struct platform_device *pdev);
 void irqgen_sysfs_cleanup(struct platform_device *pdev);
 
 #endif /* !defined(__IRQGEN_HEADER) */
+
