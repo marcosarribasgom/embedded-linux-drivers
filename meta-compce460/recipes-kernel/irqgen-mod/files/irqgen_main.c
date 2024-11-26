@@ -401,21 +401,7 @@ static void __exit irqgen_exit(void)
 }
 
 // FIXME: glue together the platform driver and the device-tree (use PROP_COMPATIBLE)
-static const struct of_device_id irqgen_of_ids[] = {
-    { .compatible = PROP_COMPATIBLE, },
-    { /* end of list */ }
-};
-//MODULE_DEVICE_TABLE(of, irqgen_of_ids);
-
-static struct platform_driver irqgen_pdriver = {
-    .driver = {
-        .name = DRIVER_NAME,
-        .owner = THIS_MODULE,
-        .of_match_table = irqgen_of_ids,
-    },
-    .probe = irqgen_probe,
-    .remove = irqgen_remove,
-};
+MODULE_DEVICE_TABLE(of, irqgen_of_ids);
 
 static const struct of_device_id irqgen_of_ids[] = {
     { .compatible = PROP_COMPATIBLE, },
