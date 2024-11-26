@@ -107,7 +107,7 @@ IRQGEN_ATTR_RO(intr_handled);
 static ssize_t count_register_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
     u32 val = irqgen_read_count();
-    return sprintf(buf, "%lu\n", val);
+    return sprintf(buf, "%u\n", val);
 }
 IRQGEN_ATTR_RO(count_register);
 

@@ -349,7 +349,7 @@ static const struct of_device_id irqgen_of_ids[] = {
     { .compatible = PROP_COMPATIBLE, },
     { /* end of list */ }
 };
-#MODULE_DEVICE_TABLE(of, irqgen_of_ids);
+MODULE_DEVICE_TABLE(of, irqgen_of_ids);
 
 static struct platform_driver irqgen_pdriver = {
     .driver = {
