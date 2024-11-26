@@ -32,4 +32,7 @@
 # define IRQGEN_MAX_AMOUNT (FIELD_GET(IRQGEN_GENIRQ_REG_F_AMOUNT, 0xFFFFFFFFL))
 
 #endif /* !defined(__IRQGEN_ADDRESSES_H) */
+<<<<<<< HEAD
 
+=======
+>>>>>>> course_upstream_updates

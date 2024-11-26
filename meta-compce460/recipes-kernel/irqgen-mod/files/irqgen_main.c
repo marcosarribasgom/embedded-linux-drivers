@@ -1,8 +1,8 @@
 /**
- * @file   irqgen.c
+ * @file   irqgen_main.c
  * @author Nicola Tuveri
- * @date   08 November 2018
- * @version 0.6
+ * @date   15 November 2018
+ * @version 0.7
  * @target_device Xilinx PYNQ-Z1
  * @brief   A stub module to support the IRQ Generator IP block for the
  *          Real-Time System course.
@@ -18,13 +18,22 @@
 #include <asm/io.h>                 // IO operations
 #include <linux/slab.h>             // Kernel slab allocator
 
+#include <linux/ktime.h>            // ktime_get_ns
+
 
 #include "irqgen.h"                 // Shared module specific declarations
 
+<<<<<<< HEAD
 #define PROP_COMPATIBLE "wapice,irq-gen" // FIXME: compatible property for the irqgen device from the devicetree
 #define PROP_WAPICE_INTRACK "wapice,intrack" // FIXME: custom intrack property from the devicetree
 
 #define FPGA_CLOCK_NS   10 /* 1000 / FPGA_CLOCK_MHZ */ // FIXME: how many nanoseconds is a FPGA clock cycle?
+=======
+#define PROP_COMPATIBLE "wapice,irq-gen"
+#define PROP_WAPICE_INTRACK "wapice,intrack"
+
+#define FPGA_CLOCK_NS   10 /* 1000 / FPGA_CLOCK_MHZ */
+>>>>>>> course_upstream_updates
 
 // Kernel token address to access the IRQ Generator core register
 void __iomem *irqgen_reg_base = NULL;
@@ -67,35 +76,89 @@ static int parse_parameters(void)
 static inline u32 irqgen_read_latency_clk(void)
 {
     return ioread32(IRQGEN_LATENCY_REG);
+<<<<<<< HEAD
+=======
+}
+
+// Push a new latency value to the circular buffer: runs inside the
+// critical section of the interrupt handler
+static inline
+void irqgen_data_push_latency(int line, u32 latency, u64 timestamp)
+{
+    int wp, rp;
+    struct latency_data s = {
+        .latency = latency,
+        .line = (u8)line,
+        .timestamp = timestamp
+    };
+
+    wp = irqgen_data->wp;
+    rp = irqgen_data->rp;
+
+    irqgen_data->latencies[wp] = s;
+    wp = (wp+1)%MAX_LATENCIES;
+    if (wp == rp) {
+        rp = (rp+1)%MAX_LATENCIES;
+    }
+
+    irqgen_data->wp = wp;
+    irqgen_data->rp = rp;
+>>>>>>> course_upstream_updates
 }
 
 static irqreturn_t irqgen_irqhandler(int irq, void *data)
 {
+<<<<<<< HEAD
     u32 idx = *(u32 *)data; // Get the IRQ line index from the data pointer
     u32 ack = irqgen_data->intr_acks[idx]; // Fetch the corresponding ACK value
     u32 regvalue = ioread32(IRQGEN_CTRL_REG); // Read the control register
 
     // Clear the handled and ACK fields, then set them with the correct values
+=======
+    u64 timestamp;
+    u32 idx, ack, latency=0, regvalue;
+
+    timestamp = ktime_get_ns();
+    idx = *(const u32 *)data;
+    ack = irqgen_data->intr_acks[idx];
+    regvalue = ioread32(IRQGEN_CTRL_REG);
+>>>>>>> course_upstream_updates
     regvalue &= ~(IRQGEN_CTRL_REG_F_HANDLED | IRQGEN_CTRL_REG_F_ACK);
     regvalue |= FIELD_PREP(IRQGEN_CTRL_REG_F_HANDLED, 1) |
                 FIELD_PREP(IRQGEN_CTRL_REG_F_ACK, ack);
 
+<<<<<<< HEAD
     iowrite32(regvalue, IRQGEN_CTRL_REG); // Write the updated value
 
     // Increment statistics
     ++irqgen_data->total_handled;
     ++irqgen_data->intr_handled[idx];
 
+=======
+>>>>>>> course_upstream_updates
 # ifdef DEBUG
     printk(KERN_INFO KMSG_PFX "IRQ #%d (idx: %d) received (ACK 0x%0X).\n", irq, idx, ack);
 # endif
 
+<<<<<<< HEAD
     // Store latency if within bounds
     if (irqgen_data->l_cnt < MAX_LATENCIES) {
         irqgen_data->latencies[irqgen_data->l_cnt++] = irqgen_read_latency_clk();
     } else {
         printk(KERN_WARNING KMSG_PFX "Latency buffer full, skipping latency record.\n");
     }
+=======
+    iowrite32(regvalue, IRQGEN_CTRL_REG);
+
+    latency = irqgen_read_latency_clk();
+
+    // TODO: handle concurrency
+    // {{{ CRITICAL SECTION
+    ++irqgen_data->total_handled;
+    ++irqgen_data->intr_handled[idx];
+    irqgen_data_push_latency(idx, latency, timestamp);
+    // }}}
+>>>>>>> course_upstream_updates
 
     return IRQ_HANDLED; // Notify the kernel that the interrupt was handled
 }
@@ -104,7 +167,11 @@ static irqreturn_t irqgen_irqhandler(int irq, void *data)
 /* Enable the IRQ Generator */
 void enable_irq_generator(void)
 {
+<<<<<<< HEAD
    #ifdef DEBUG
+=======
+#ifdef DEBUG
+>>>>>>> course_upstream_updates
     printk(KERN_INFO KMSG_PFX "Enabling IRQ Generator.\n");
 #endif
     u32 regvalue = FIELD_PREP(IRQGEN_CTRL_REG_F_ENABLE, 1);
@@ -114,6 +181,7 @@ void enable_irq_generator(void)
 /* Disable the IRQ Generator */
 void disable_irq_generator(void)
 {
+<<<<<<< HEAD
     #ifdef DEBUG
     printk(KERN_INFO KMSG_PFX "Disabling IRQ Generator.\n");
     #endif
@@ -121,6 +189,15 @@ void disable_irq_generator(void)
     iowrite32(regvalue, IRQGEN_CTRL_REG);
 
     regvalue = FIELD_PREP(IRQGEN_GENIRQ_REG_F_AMOUNT, 0);
+=======
+#ifdef DEBUG
+    printk(KERN_INFO KMSG_PFX "Disabling IRQ Generator.\n");
+#endif
+    u32 regvalue = FIELD_PREP(IRQGEN_CTRL_REG_F_ENABLE, 0);
+    iowrite32(regvalue, IRQGEN_CTRL_REG);
+
+    regvalue = FIELD_PREP(IRQGEN_GENIRQ_REG_F_AMOUNT,  0);
+>>>>>>> course_upstream_updates
     iowrite32(regvalue, IRQGEN_GENIRQ_REG);
 }
 
@@ -132,7 +209,7 @@ void do_generate_irqs(uint16_t amount, uint8_t line, uint16_t delay)
                    | FIELD_PREP(IRQGEN_GENIRQ_REG_F_DELAY,    delay)
                    | FIELD_PREP(IRQGEN_GENIRQ_REG_F_LINE,      line);
 
-    printk(KERN_INFO KMSG_PFX "Generating %u interrupts with IRQ delay %u on line %d.\n",
+    printk(KERN_DEBUG KMSG_PFX "Generating %u interrupts with IRQ delay %u on line %d.\n",
            amount, delay, line);
 
     iowrite32(regvalue, IRQGEN_GENIRQ_REG);
@@ -180,10 +257,11 @@ int _devm_request_irq(struct device *_dev, unsigned int _irq, irq_handler_t _han
 static int irqgen_probe(struct platform_device *pdev)
 {
     int retval = 0;
-    int irqs_count = 0, irqs_acks = 0;
     int i;
+    int irqs_count = 0, irqs_acks = 0;
     struct resource *iomem_range = NULL;
 
+<<<<<<< HEAD
     // Allocate the main irqgen_data structure
     DEVM_KZALLOC_HELPER(irqgen_data, pdev, 1, GFP_KERNEL);
 
@@ -214,6 +292,29 @@ static int irqgen_probe(struct platform_device *pdev)
     }
 
     // Enable IRQs and ACKs based on device tree properties
+=======
+    DEVM_KZALLOC_HELPER(irqgen_data, pdev, 1, GFP_KERNEL);
+    DEVM_KZALLOC_HELPER(irqgen_data->latencies, pdev, MAX_LATENCIES, GFP_KERNEL);
+
+    // TODO: how to protect the shared r/w members of irqgen_data?
+
+    iomem_range = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+    if (IS_ERR(iomem_range)) {
+        printk(KERN_ERR KMSG_PFX "platform_get_resource(IORESOURCE_MEM) failed.\n");
+        retval=PTR_ERR(iomem_range);
+        goto err;
+    }
+
+    /* Map the IRQ Generator core register with ioremap */
+    irqgen_reg_base = devm_ioremap_resource(&pdev->dev, iomem_range);
+    if (IS_ERR(irqgen_reg_base)) {
+        printk(KERN_ERR KMSG_PFX "devm_ioremap_resource(IORESOURCE_MEM) failed.\n");
+        retval = PTR_ERR(irqgen_reg_base);
+        irqgen_reg_base = NULL;
+        goto err;
+    }
+
+>>>>>>> course_upstream_updates
     irqs_count = platform_irq_count(pdev);
     irqs_acks = of_property_count_u32_elems(pdev->dev.of_node, PROP_WAPICE_INTRACK);
 
@@ -231,8 +332,23 @@ static int irqgen_probe(struct platform_device *pdev)
         goto err;
     }
 
+<<<<<<< HEAD
     // Read ACK values from the device tree
     retval = of_property_read_u32_array(pdev->dev.of_node, PROP_WAPICE_INTRACK, irqgen_data->intr_acks, irqs_count);
+=======
+    DEVM_KZALLOC_HELPER(irqgen_data->intr_ids,
+                        pdev, irqs_count, GFP_KERNEL);
+    DEVM_KZALLOC_HELPER(irqgen_data->intr_idx,
+                        pdev, irqs_count, GFP_KERNEL);
+    DEVM_KZALLOC_HELPER(irqgen_data->intr_acks,
+                        pdev, irqs_count, GFP_KERNEL);
+    DEVM_KZALLOC_HELPER(irqgen_data->intr_handled,
+                        pdev, irqs_count, GFP_KERNEL);
+
+    irqgen_data->line_count = irqs_count;
+    retval = of_property_read_u32_array(pdev->dev.of_node, PROP_WAPICE_INTRACK,
+                                        irqgen_data->intr_acks, irqs_count);
+>>>>>>> course_upstream_updates
     if (retval) {
         printk(KERN_ERR KMSG_PFX "Failed to read interrupt ACK values from device tree.\n");
         goto err;
@@ -256,10 +372,22 @@ static int irqgen_probe(struct platform_device *pdev)
         irqgen_data->intr_ids[i] = irq_id;
         irqgen_data->intr_idx[i] = i;
 
+<<<<<<< HEAD
         // Request IRQ
         retval = _devm_request_irq(&pdev->dev, irq_id, irqgen_irqhandler, IRQF_SHARED, DRIVER_NAME, &irqgen_data->intr_idx[i]);
         if (retval) {
             printk(KERN_ERR KMSG_PFX "devm_request_irq() failed for IRQ id %u with return value %d.\n", irq_id, retval);
+=======
+        /* Register the handle to the relevant IRQ number and the corresponding idx value */
+        retval = _devm_request_irq(&pdev->dev, irq_id, irqgen_irqhandler,
+                                   IRQF_SHARED, DRIVER_NAME,
+                                   &irqgen_data->intr_idx[i]);
+        if (retval != 0) {
+            printk(KERN_ERR KMSG_PFX
+                   "devm_request_irq() failed with return value %d "
+                   "while requesting IRQ id %u.\n",
+                   retval, irq_id);
+>>>>>>> course_upstream_updates
             goto err;
         }
     }
@@ -271,19 +399,39 @@ static int irqgen_probe(struct platform_device *pdev)
         goto err_sysfs_setup;
     }
 
+    retval = irqgen_cdev_setup(pdev);
+    if (0 != retval) {
+        printk(KERN_ERR KMSG_PFX "chardev setup failed.\n");
+        goto err_cdev_setup;
+    }
+
     return 0;
 
+<<<<<<< HEAD
 err_sysfs_setup:
     irqgen_sysfs_cleanup(pdev);
 err:
     printk(KERN_ERR KMSG_PFX "probe() failed.\n");
+=======
+ err_cdev_setup:
+    irqgen_sysfs_cleanup(pdev);
+ err_sysfs_setup:
+ err:
+    printk(KERN_ERR KMSG_PFX "probe() failed\n");
+>>>>>>> course_upstream_updates
     return retval;
 }
 
 
 static int irqgen_remove(struct platform_device *pdev)
 {
+<<<<<<< HEAD
   irqgen_sysfs_cleanup(pdev);
+=======
+    irqgen_cdev_cleanup(pdev);
+    irqgen_sysfs_cleanup(pdev);
+
+>>>>>>> course_upstream_updates
     return 0;
 }
 
@@ -300,12 +448,21 @@ static int32_t __init irqgen_init(void)
         goto err_parse_parameters;
     }
 
+<<<<<<< HEAD
     // FIXME: something is missing here
     retval = platform_driver_probe(&irqgen_pdriver, irqgen_probe);
     if (retval) {
          printk(KERN_ERR KMSG_PFX "platform_driver_probe() failed\n");
          goto err_platform_driver_probe;
     }
+=======
+    retval = platform_driver_probe(&irqgen_pdriver, irqgen_probe);
+    if (retval) {
+        printk(KERN_ERR KMSG_PFX "platform_driver_probe() failed\n");
+        goto err_platform_driver_probe;
+    }
+
+>>>>>>> course_upstream_updates
     /* Enable the IRQ Generator */
     enable_irq_generator();
 
@@ -335,8 +492,14 @@ static void __exit irqgen_exit(void)
     /* Disable the IRQ Generator */
     disable_irq_generator();
 
+<<<<<<< HEAD
     /* FIXME: Unregister the platform driver and associated resources */
     platform_driver_unregister(&irqgen_pdriver);
+=======
+    /* Unregister the platform driver and associated resources */
+    platform_driver_unregister(&irqgen_pdriver);
+
+>>>>>>> course_upstream_updates
     printk(KERN_INFO KMSG_PFX DRIVER_LNAME " exiting.\n");
 }
 
@@ -344,6 +507,7 @@ static void __exit irqgen_exit(void)
 
 
 
+<<<<<<< HEAD
 // FIXME: glue together the platform driver and the device-tree (use PROP_COMPATIBLE)
 static const struct of_device_id irqgen_of_ids[] = {
     { .compatible = PROP_COMPATIBLE, },
@@ -360,7 +524,24 @@ static struct platform_driver irqgen_pdriver = {
     .probe = irqgen_probe,
     .remove = irqgen_remove,
 };
+=======
+>>>>>>> course_upstream_updates
 
+
+static const struct of_device_id irqgen_of_ids[] = {
+    { .compatible = PROP_COMPATIBLE, },
+    { /* end of list */ }
+};
+
+static struct platform_driver irqgen_pdriver = {
+    .driver = {
+        .name = DRIVER_NAME,
+        .owner = THIS_MODULE,
+        .of_match_table = irqgen_of_ids,
+    },
+    .probe = irqgen_probe,
+    .remove = irqgen_remove,
+};
 
 module_init(irqgen_init);
 module_exit(irqgen_exit);
@@ -372,5 +553,9 @@ MODULE_AUTHOR("Marcos <marcos.arribas-gomez@tuni.fi>");
 MODULE_AUTHOR("Asri <mohamed.asri@tuni.fi>");
 MODULE_AUTHOR("Jan Lipponen <jan.lipponen@wapice.com>");
 MODULE_AUTHOR("Nicola Tuveri <nicola.tuveri@tut.fi>");
+<<<<<<< HEAD
 MODULE_VERSION("0.6");
 
+=======
+MODULE_VERSION("0.7");
+>>>>>>> course_upstream_updates
