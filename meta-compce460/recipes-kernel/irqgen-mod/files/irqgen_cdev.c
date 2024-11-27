@@ -1,15 +1,23 @@
 /**
  * @file   irqgen_cdev.c
- * @brief  Character device support for the IRQ Generator module
+ * @author Nicola Tuveri
+ * @date   15 November 2018
+ * @version 0.7
+ * @target_device Xilinx PYNQ-Z1
+ * @brief   A stub module to support the IRQ Generator IP block for the
+ *          Real-Time System course (character device support).
  */
 
-#include <linux/kernel.h>           // Contains types, macros, functions for the kernel
-#include <linux/device.h>
-#include <linux/string.h>
-#include <linux/cdev.h>             // Header for character devices support
-#include <linux/fs.h>               // Header for Linux file system support
-#include <linux/uaccess.h>          // Header for userspace access support
-#include "irqgen.h"                 // Shared module specific declarations
+# include <linux/kernel.h>           // Contains types, macros, functions for the kernel
+
+# include <linux/device.h>
+# include <linux/string.h>
+
+# include <linux/cdev.h>             // Header for character devices support
+# include <linux/fs.h>               // Header for Linux file system support
+# include <linux/uaccess.h>          // Header for userspace access support
+
+# include "irqgen.h"                 // Shared module specific declarations
 
 #define IRQGEN_CDEV_CLASS "irqgen-class"
 
@@ -18,11 +26,13 @@ struct irqgen_chardev {
     dev_t devt;
     struct device *dev;
     struct class *class;
+
+    // TODO: do we need a sync mechanism for any cdev operation?
 };
 
 static struct irqgen_chardev irqgen_chardev;
 
-// Function prototypes for the character driver
+// The prototype functions for the character driver -- must come before the struct definition
 static int     irqgen_cdev_open(struct inode *, struct file *);
 static int     irqgen_cdev_release(struct inode *, struct file *);
 static ssize_t irqgen_cdev_read(struct file *, char *, size_t, loff_t *);
@@ -33,18 +43,10 @@ static struct file_operations fops = {
     .read = irqgen_cdev_read,
 };
 
-// Synchronization variable for shared resources
-static u8 already_opened = 0;
-
 // Initialize the char device driver
 int irqgen_cdev_setup(struct platform_device *pdev)
 {
     int ret;
-
-    // Initialize the character device
-    cdev_init(&irqgen_chardev.cdev, &fops);
-    irqgen_chardev.cdev.owner = THIS_MODULE;
-    irqgen_chardev.cdev.kobj.parent = &pdev->dev.kobj;
 
     // Dynamically allocate a major and minor number
     ret = alloc_chrdev_region(&irqgen_chardev.devt, 0, 1, DRIVER_NAME);
@@ -53,124 +55,134 @@ int irqgen_cdev_setup(struct platform_device *pdev)
         return ret;
     }
 
-    // Add the character device to the system
+    // Initialize the cdev structure
+    cdev_init(&irqgen_chardev.cdev, &fops);
+    irqgen_chardev.cdev.owner = THIS_MODULE;
+
+    // Add the cdev to the system
     ret = cdev_add(&irqgen_chardev.cdev, irqgen_chardev.devt, 1);
     if (ret < 0) {
         printk(KERN_ERR KMSG_PFX "Failed to add cdev.\n");
-        goto err_unregister_chrdev_region;
+        unregister_chrdev_region(irqgen_chardev.devt, 1);
+        return ret;
     }
 
-    // Create device class
+    // Create a class for the device
     irqgen_chardev.class = class_create(THIS_MODULE, IRQGEN_CDEV_CLASS);
     if (IS_ERR(irqgen_chardev.class)) {
-        ret = PTR_ERR(irqgen_chardev.class);
         printk(KERN_ERR KMSG_PFX "Failed to create device class.\n");
-        goto err_cdev_del;
+        ret = PTR_ERR(irqgen_chardev.class);
+        cdev_del(&irqgen_chardev.cdev);
+        unregister_chrdev_region(irqgen_chardev.devt, 1);
+        return ret;
     }
 
-    // Create device node in /dev
-    irqgen_chardev.dev = device_create(irqgen_chardev.class, &pdev->dev,
-                                       irqgen_chardev.devt, NULL, DRIVER_NAME);
+    // Create the device node in /dev
+    irqgen_chardev.dev = device_create(irqgen_chardev.class, NULL, irqgen_chardev.devt, NULL, DRIVER_NAME);
     if (IS_ERR(irqgen_chardev.dev)) {
+        printk(KERN_ERR KMSG_PFX "Failed to create device node.\n");
         ret = PTR_ERR(irqgen_chardev.dev);
-        printk(KERN_ERR KMSG_PFX "Failed to create device.\n");
-        goto err_class_destroy;
+        class_destroy(irqgen_chardev.class);
+        cdev_del(&irqgen_chardev.cdev);
+        unregister_chrdev_region(irqgen_chardev.devt, 1);
+        return ret;
     }
 
+    printk(KERN_INFO KMSG_PFX "Character device setup completed.\n");
     return 0;
-
-err_class_destroy:
-    class_destroy(irqgen_chardev.class);
-err_cdev_del:
-    cdev_del(&irqgen_chardev.cdev);
-err_unregister_chrdev_region:
-    unregister_chrdev_region(irqgen_chardev.devt, 1);
-    return ret;
 }
+
 
 void irqgen_cdev_cleanup(struct platform_device *pdev)
 {
-    device_destroy(irqgen_chardev.class, irqgen_chardev.devt);
-    class_destroy(irqgen_chardev.class);
+    // Destroy the device node
+    if (irqgen_chardev.dev) {
+        device_destroy(irqgen_chardev.class, irqgen_chardev.devt);
+    }
+
+    // Destroy the device class
+    if (irqgen_chardev.class) {
+        class_destroy(irqgen_chardev.class);
+    }
+
+    // Delete the cdev structure
     cdev_del(&irqgen_chardev.cdev);
+
+    // Unregister the major and minor numbers
     unregister_chrdev_region(irqgen_chardev.devt, 1);
+
+    printk(KERN_INFO KMSG_PFX "Character device cleanup completed.\n");
 }
+
+
+static u8 already_opened = 0;
 
 static int irqgen_cdev_open(struct inode *inode, struct file *f)
 {
-    unsigned long flags;
-
-#ifdef DEBUG
+# ifdef DEBUG
     printk(KERN_DEBUG KMSG_PFX "irqgen_cdev_open() called.\n");
-#endif
+# endif
 
-    spin_lock_irqsave(&irqgen_data->lock, flags);
     if (already_opened) {
-        spin_unlock_irqrestore(&irqgen_data->lock, flags);
         return -EBUSY;
     }
     already_opened = 1;
-    spin_unlock_irqrestore(&irqgen_data->lock, flags);
-
     return 0;
 }
 
 static int irqgen_cdev_release(struct inode *inode, struct file *f)
 {
-    unsigned long flags;
-
-#ifdef DEBUG
+# ifdef DEBUG
     printk(KERN_DEBUG KMSG_PFX "irqgen_cdev_release() called.\n");
-#endif
+# endif
 
-    spin_lock_irqsave(&irqgen_data->lock, flags);
     if (!already_opened) {
-        spin_unlock_irqrestore(&irqgen_data->lock, flags);
         return -ECANCELED;
     }
     already_opened = 0;
-    spin_unlock_irqrestore(&irqgen_data->lock, flags);
-
     return 0;
 }
 
+// This will write in the userspace buffer one line at a time, the
+// client (or the std library) will retry automatically.
+//
+// NOTE: We require the userland buffer to be at least 60 bytes (count>=60)
 static ssize_t irqgen_cdev_read(struct file *fp, char *ubuf, size_t count, loff_t *f_pos)
 {
-    unsigned long flags;
-    static char kbuf[100];
+#define KBUF_SIZE 100
+    static char kbuf[KBUF_SIZE];
     ssize_t ret = 0;
-    struct latency_data v;
 
     if (count < 60) {
-        return -ENOBUFS; // Buffer too small
+        return -ENOBUFS;  // Ensure buffer is large enough
     }
 
-    // Enter critical section
-    spin_lock_irqsave(&irqgen_data->lock, flags);
-
+    // Check if the circular buffer is empty
     if (irqgen_data->rp == irqgen_data->wp) {
-        // Circular buffer is empty
-        spin_unlock_irqrestore(&irqgen_data->lock, flags);
-        return 0;
+        return 0;  // No data to read
     }
 
-    v = irqgen_data->latencies[irqgen_data->rp];
+    // Read latency data from the buffer
+    struct latency_data v = irqgen_data->latencies[irqgen_data->rp];
+
+    // Increment the read pointer (circular buffer logic)
     irqgen_data->rp = (irqgen_data->rp + 1) % MAX_LATENCIES;
 
-    // Exit critical section
-    spin_unlock_irqrestore(&irqgen_data->lock, flags);
-
-    ret = scnprintf(kbuf, sizeof(kbuf), "%u,%lu,%llu\n", v.line, v.latency, v.timestamp);
+    // Format the data into a CSV line
+    ret = scnprintf(kbuf, KBUF_SIZE, "%u,%lu,%llu\n", v.line, v.latency, v.timestamp);
     if (ret < 0) {
-        return ret;
+        return -ENOMEM;  // Error in formatting data
     }
 
-    // Copy data to user space
+    // Transfer the data from kernel space to user space
     if (copy_to_user(ubuf, kbuf, ret)) {
-        return -EFAULT;
+        return -EFAULT;  // Error in transferring to user space
     }
 
+    // Update file position (POSIX requirement)
     *f_pos += ret;
-    return ret;
+
+    return ret;  // Return the number of bytes read
+#undef KBUF_SIZE
 }
 
